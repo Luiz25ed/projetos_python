@@ -57,7 +57,7 @@ def render_lista_operacional(df: pd.DataFrame) -> None:
         "dias_vencer": "Dias a Vencer", "perda_rs": "Perda Prevista (R$)", "verificado": "Auditado"
     })
 
-    # Data Editor Inteligente Isolado da Camada SQL Direta
+    # Data Editor Inteligente com chave fixa segura
     editado = st.data_editor(
         exibir,
         column_config={
@@ -65,26 +65,39 @@ def render_lista_operacional(df: pd.DataFrame) -> None:
             "Perda Prevista (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
             "Auditado": st.column_config.CheckboxColumn(),
         },
-        hide_index=True, use_container_width=True, height=400, key="editor_tabela_principal"
+        hide_index=True, 
+        use_container_width=True, 
+        height=400, 
+        key="editor_tabela_operacional_unica"
     )
 
-    # Identificação reativa de mudança antes de persistir no SQLite
+    # Processamento das mudanças no banco de dados
+    houve_mudanca = False
     for _, row in editado.iterrows():
         chave_atual = row["chave"]
         v_novo = bool(row["Auditado"])
         
-        # Encontra correspondência original
-        original = df[df["chave"] == chave_atual].iloc[0]
-        if original["verificado"] != v_novo:
-            salvar_estado_verificado(
-                chave=chave_atual,
-                descricao=original["descricao"],
-                dias=int(original["dias_vencer"]),
-                perda=float(original["perda_rs"]),
-                verificado=v_novo
-            )
-            st.rerun()
+        # Encontra correspondência original de forma segura usando o df original
+        linhas_originais = df[df["chave"] == chave_atual]
+        if not linhas_originais.empty:
+            original = linhas_originais.iloc[0]
+            if bool(original["verificado"]) != v_novo:
+                salvar_estado_verificado(
+                    chave=chave_atual,
+                    descricao=original["descricao"],
+                    dias=int(original["dias_vencer"]),
+                    perda=float(original["perda_rs"]),
+                    verificado=v_novo
+                )
+                houve_mudanca = True
 
+    # Atualiza o estado da sessão global se algo mudou
+    if houve_mudanca:
+        st.session_state["df_extraido"]["verificado"] = st.session_state["df_extraido"]["chave"].map(
+            lambda k: v_novo if k == chave_atual else st.session_state["df_extraido"].loc[st.session_state["df_extraido"]["chave"] == k, "verificado"].values[0]
+        )
+        st.rerun()
+        
 def render_modulo_inteligencia(df: pd.DataFrame) -> None:
     st.subheader("💡 Recomendações e Insights do Motor de IA")
     insights = gerar_insights_negocio(df)
