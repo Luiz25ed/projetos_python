@@ -27,7 +27,7 @@ def plot_pareto_criticidade(df: pd.DataFrame) -> go.Figure:
     fig.update_layout(
         title=dict(
             text="Análise de Pareto por Faixa de Vencimento",
-            y=0.92,
+            y=0.95,
             x=0.5,
             xanchor='center',
             yanchor='top'
@@ -35,16 +35,11 @@ def plot_pareto_criticidade(df: pd.DataFrame) -> go.Figure:
         yaxis=dict(title="Perda Financeira (R$)"),
         yaxis2=dict(title="Percentual Acumulado (%)", overlaying="y", side="right", range=[0, 105]),
         
-        # Posiciona a legenda no topo direito de forma flutuante e limpa
-        legend=dict(
-            orientation="v",         # Orientação vertical para economizar espaço horizontal
-            yanchor="top", 
-            y=0.88,                  # Coloca logo abaixo do título principal
-            xanchor="right", 
-            x=0.85                   # Alinha à direita antes do segundo eixo
-        ),
-        height=380,                  # Aumentado levemente para acomodar as rotações do eixo X
-        margin=dict(l=10, r=10, t=70, b=90) # Margem inferior (b=90) expandida para os rótulos longos não cortarem
+        # 🟢 REMOVE A LEGENDA COMPLETAMENTE PARA DEIXAR O VISUAL LIMPO
+        showlegend=False, 
+        
+        height=380,
+        margin=dict(l=10, r=10, t=60, b=90) # Ajustado o topo para o título respirar sem a legenda
     )
     return fig
 
