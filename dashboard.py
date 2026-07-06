@@ -105,15 +105,52 @@ def render_modulo_inteligencia(df: pd.DataFrame) -> None:
     st.info(f"🎯 **Produto com Maior Índice de Desperdício:** {insights.get('produto_maior_perda')}")
     
     c1, c2, c3 = st.columns(3)
+    
+    # Configuração visual padrão para reaproveitamento de código nas 3 colunas
+    config_colunas = {
+        "descricao": st.column_config.TextColumn("Descrição", width="large"),
+        "dias_vencer": st.column_config.NumberColumn("Dias", width="small"),
+        "perda_rs": st.column_config.NumberColumn("Perda (R$)", format="R$ %.2f", width="medium")
+    }
+
     with c1:
         st.write("🛑 **Perda Total Imediata (Até 7 dias):**")
-        st.dataframe(insights.get("produtos_proximos_perda_total")[["descricao", "dias_vencer", "perda_rs"]], hide_index=True)
+        df_p1 = insights.get("produtos_proximos_perda_total", pd.DataFrame())
+        if not df_p1.empty:
+            st.dataframe(
+                df_p1[["descricao", "dias_vencer", "perda_rs"]], 
+                column_config=config_colunas,
+                hide_index=True,
+                use_container_width=True
+            )
+        else:
+            st.caption("Nenhum produto nesta faixa crítica.")
+
     with c2:
-        st.write("🏷️ **Aplicar Desconto Promocional Urgente (8 a 20 dias):**")
-        st.dataframe(insights.get("produtos_para_promocao")[["descricao", "dias_vencer", "perda_rs"]], hide_index=True)
+        st.write("🏷️ **Desconto Promocional Urgente (8 a 20 dias):**")
+        df_p2 = insights.get("produtos_para_promocao", pd.DataFrame())
+        if not df_p2.empty:
+            st.dataframe(
+                df_p2[["descricao", "dias_vencer", "perda_rs"]], 
+                column_config=config_colunas,
+                hide_index=True,
+                use_container_width=True
+            )
+        else:
+            st.caption("Nenhum produto recomendado para promoção.")
+
     with c3:
         st.write("🚚 **Produtos Aptos para Transferência entre Lojas:**")
-        st.dataframe(insights.get("produtos_para_transferencia")[["descricao", "dias_vencer", "perda_rs"]], hide_index=True)
+        df_p3 = insights.get("produtos_para_transferencia", pd.DataFrame())
+        if not df_p3.empty:
+            st.dataframe(
+                df_p3[["descricao", "dias_vencer", "perda_rs"]], 
+                column_config=config_colunas,
+                hide_index=True,
+                use_container_width=True
+            )
+        else:
+            st.caption("Nenhum produto recomendado para transferência.")
 
 def render_historico_auditoria() -> None:
     st.subheader("📜 Log de Auditoria e Histórico de Alterações")
