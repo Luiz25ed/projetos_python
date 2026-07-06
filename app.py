@@ -68,9 +68,9 @@ CORES_CATEGORIA = {
 
 def clean_num(s):
     """Converte string em formato BR ('R$ 1.234,56') para float."""
-    if not s:
+    if s is None:
         return 0.0
-    s = s.replace("\n", "").replace("R$", "").strip()
+    s = str(s).replace("\n", "").replace("R$", "").strip()
     s = s.replace(".", "").replace(",", ".")
     try:
         return float(s)
@@ -79,7 +79,7 @@ def clean_num(s):
 
 
 def categoriza(descricao: str) -> str:
-    d = descricao.upper()
+    d = str(descricao).upper()
     for categoria, palavras in CATEGORIAS_KEYWORDS.items():
         if any(p in d for p in palavras):
             return categoria
@@ -93,29 +93,41 @@ def extrair_pdf(arquivo_bytes: bytes) -> pd.DataFrame:
     rows = []
     with pdfplumber.open(io.BytesIO(arquivo_bytes)) as pdf:
         for page in pdf.pages:
-            for table in page.extract_tables():
+            tables = page.extract_tables()
+            for table in tables:
                 for r in table:
-                    if r and len(r) >= 27:
+                    # Permite leitura dinâmica se o relatório tiver variações de colunas na impressão
+                    if r and len(r) >= 18:
                         rows.append(r)
 
     registros = []
     for r in rows:
-        desc = (r[3] or "").replace("\n", " ").strip()
-        if not desc or desc.upper() == "DESCRIÇÃO":
-            continue
-        dias_raw = (r[13] or "").replace("\n", "").strip()
         try:
-            dias = int(dias_raw)
-        except ValueError:
-            dias = 0
-        registros.append({
-            "descricao": desc.title(),
-            "dias_vencer": dias,
-            "perda_qtde": clean_num(r[16]),
-            "perda_rs": clean_num(r[17]),
-            "custo_liquido": clean_num(r[19]),
-            "setor_erp": (r[26] or "").replace("\n", "").strip(),
-        })
+            desc = str(r[3] or "").replace("\n", " ").strip()
+            if not desc or desc.upper() == "DESCRIÇÃO":
+                continue
+            
+            dias_raw = str(r[13] or "").replace("\n", "").strip()
+            try:
+                dias = int(dias_raw)
+            except ValueError:
+                dias = 0
+                
+            perda_qtde = clean_num(r[16]) if len(r) > 16 else 0.0
+            perda_rs = clean_num(r[17]) if len(r) > 17 else 0.0
+            custo_liquido = clean_num(r[19]) if len(r) > 19 else 0.0
+            setor_erp = str(r[26] or "").replace("\n", "").strip() if len(r) > 26 else "Geral"
+
+            registros.append({
+                "descricao": desc.title(),
+                "dias_vencer": dias,
+                "perda_qtde": perda_qtde,
+                "perda_rs": perda_rs,
+                "custo_liquido": custo_liquido,
+                "setor_erp": setor_erp,
+            })
+        except Exception:
+            continue
 
     df = pd.DataFrame(registros)
     if df.empty:
@@ -131,14 +143,17 @@ def extrair_pdf(arquivo_bytes: bytes) -> pd.DataFrame:
 def carrega_verificados() -> dict:
     if VERIFICADOS_PATH.exists():
         try:
-            return json.loads(VERIFICADOS_PATH.read_text())
+            return json.loads(VERIFICADOS_PATH.read_text(encoding="utf-8"))
         except Exception:
             return {}
     return {}
 
 
 def salva_verificados(d: dict):
-    VERIFICADOS_PATH.write_text(json.dumps(d, ensure_ascii=False))
+    try:
+        VERIFICADOS_PATH.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    except Exception as e:
+        st.error(f"Erro ao salvar banco de verificações: {e}")
 
 
 def chave_item(row) -> str:
@@ -186,11 +201,9 @@ def main():
         "com previsão de perda e monta a lista de prioridade."
     )
 
-    # Inicializa variáveis de estado persistentes na sessão
     if "df_extraido" not in st.session_state:
         st.session_state["df_extraido"] = None
 
-    # Uploader mapeado para o gatilho inteligente do Streamlit
     st.file_uploader(
         "Relatório de validade (PDF)", 
         type=["pdf"], 
@@ -198,30 +211,32 @@ def main():
         on_change=gatilho_upload_pdf
     )
 
-    # Força a parada caso nenhum arquivo esteja carregado
     if st.session_state["df_extraido"] is None:
         st.info("Aguardando o PDF do relatório de validade para começar.")
         st.stop()
 
-    # Copia segura para manipulação e filtros
     df = st.session_state["df_extraido"].copy()
 
     if df.empty:
         st.error(
-            "Não consegui extrair linhas do PDF. O layout pode ser "
-            "diferente do esperado — avise que ajustamos os índices de coluna."
+            "Não consegui extrair linhas válidas do PDF. O layout pode ser "
+            "diferente do esperado ou os valores de perda estão zerados."
         )
         st.stop()
 
-    # Filtra e constrói chaves de identificação estáveis
+    # Prepara identificadores únicos estáveis e remove itens zerados
     df = df[df["perda_rs"] > 0].copy()
+    
+    if df.empty:
+        st.info("Todos os produtos deste relatório estão com Previsão de Perda zerada.")
+        st.stop()
+        
     df["chave"] = df.apply(chave_item, axis=1)
 
-    # Carrega os dados de persistência local antes do restante da renderização
+    # Carrega dados locais de persistência
     verificados = carrega_verificados()
     df["verificado"] = df["chave"].map(lambda k: verificados.get(k, False))
 
-    # --- Nova Coluna de Faixa de Criticidade (15, 30, 60 dias) -------------
     def define_criticidade(dias):
         if dias <= 15:
             return "1. Crítico (Até 15 dias)"
@@ -262,7 +277,7 @@ def main():
     )
     col3.metric("Itens com perda prevista", len(df))
 
-    # --- Layout Visual: Gráfico por Categoria + Mapa de Criticidade ----
+    # --- Layout Visual: Gráficos --------------------------------------
     col_graf1, col_graf2 = st.columns(2)
 
     with col_graf1:
@@ -345,7 +360,7 @@ def main():
     else:
         filtrado = filtrado.sort_values("dias_vencer", ascending=True)
 
-    # --- Tabela editável (checkbox de verificado) ------------------------
+    # --- Tabela editável inteligente -------------------------------------
     exibir = filtrado[["chave", "descricao", "categoria", "faixa_criticidade", "dias_vencer", "perda_rs", "verificado"]].copy()
     exibir = exibir.rename(columns={
         "descricao": "Produto",
@@ -369,20 +384,27 @@ def main():
         key="tabela_prioridade",
     )
 
-    # Salva mudanças do checkbox de checagem
+    # Validação inteligente de persistência (evita loops infinitos de Rerun)
+    houve_mudanca = False
     for _, row in editado.iterrows():
-        verificados[row["chave"]] = bool(row["Verificado"])
-    salva_verificados(verificados)
+        k = row["chave"]
+        v_novo = bool(row["Verificado"])
+        if verificados.get(k, False) != v_novo:
+            verificados[k] = v_novo
+            houve_mudanca = True
+
+    if houve_mudanca:
+        salva_verificados(verificados)
+        st.rerun()
 
     st.caption(
         f"{len(filtrado)} de {len(df)} itens exibidos. "
-        "Marque como verificado ao tratar o item (retirar, promover ou devolver)."
+        "Marque como verificado ao tratar o item."
     )
 
     # --- Seção de Download / Exportação ---------------------------------
     st.markdown("---")
     st.subheader("📥 Exportar Relatório Atual")
-    st.caption("Baixe a lista de produtos baseada nos filtros aplicados acima:")
     
     df_export = filtrado[["descricao", "categoria", "faixa_criticidade", "dias_vencer", "perda_rs", "verificado"]].rename(
         columns={
