@@ -50,5 +50,5 @@ def plot_gauge_resolucao(percentual: float) -> go.Figure:
         title={'text': "Eficiência de Tratamento do Estoque"},
         gauge={'axis': {'range': [0, 100]}, 'bar': {'color': "#4FA98C"}}
     ))
-    fig.update_layout(height=230, margin=dict(l=10, r=10, t=40, b=10))
+    fig.update_layout(height=220, margin=dict(l=10, r=10, t=40, b=10))
     return fig
