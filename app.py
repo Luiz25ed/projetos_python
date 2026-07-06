@@ -57,23 +57,28 @@ def main() -> None:
             st.session_state["df_extraido"] = None
 
     # Redirecionamento de Fluxo de Página Vazia
+    # Redirecionamento de Fluxo de Página Vazia (Filtro de Segurança)
     if st.session_state["df_extraido"] is None:
         st.info("👋 Bem-vindo! Para iniciar o painel analítico, realize o upload do PDF do ERP no menu à esquerda.")
         st.stop()
 
     df_sessao = st.session_state["df_extraido"]
 
-    # 4. Roteador de Telas (Router Pattern)
-    if menu == "Dashboard Executivo":
-        render_dashboard_executivo(df_sessao)
-    elif menu == "Lista Operacional":
-        render_lista_operacional(df_sessao)
-    elif menu == "Recomendações IA":
-        render_modulo_inteligencia(df_sessao)
-    elif menu == "Histórico de Auditoria":
-        render_historico_auditoria()
-    elif menu == "Configurações & Exportações":
-        render_exportacao_relatorios(df_sessao)
+    # 4. Roteador de Telas Seguro (Garante que o dataframe é válido antes de renderizar)
+    try:
+        if menu == "Dashboard Executivo":
+            render_dashboard_executivo(df_sessao)
+        elif menu == "Lista Operacional":
+            render_lista_operacional(df_sessao)
+        elif menu == "Recomendações IA":
+            render_modulo_inteligencia(df_sessao)
+        elif menu == "Histórico de Auditoria":
+            render_historico_auditoria()
+        elif menu == "Configurações & Exportações":
+            render_exportacao_relatorios(df_sessao)
+    except Exception as e:
+        st.error("⚠️ O formato deste PDF específico não pôde ser renderizado nos gráficos atuais.")
+        st.info("Dica: Vá até a aba 'Lista Operacional' para verificar se os dados brutos foram lidos corretamente.")
 
 if __name__ == "__main__":
     main()
