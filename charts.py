@@ -25,11 +25,24 @@ def plot_pareto_criticidade(df: pd.DataFrame) -> go.Figure:
     fig.add_trace(go.Scatter(x=resumo["faixa_criticidade"], y=resumo["cum_percentage"], name="% Acumulado", yaxis="y2", line=dict(color="#E3A23D", width=3)))
     
     fig.update_layout(
-        title="Análise de Pareto por Faixa de Vencimento",
+        title=dict(
+            text="Análise de Pareto por Faixa de Vencimento",
+            y=0.95, # Ajusta a altura do título para cima
+            x=0.5,
+            xanchor='center',
+            yanchor='top'
+        ),
         yaxis=dict(title="Perda Financeira (R$)"),
         yaxis2=dict(title="Percentual Acumulado (%)", overlaying="y", side="right", range=[0, 105]),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        height=330, margin=dict(l=10, r=10, t=40, b=10)
+        legend=dict(
+            orientation="h", 
+            yanchor="bottom", 
+            y=-0.3, # Move a legenda para baixo do gráfico, liberando espaço no topo
+            xanchor="center", 
+            x=0.5
+        ),
+        height=350, 
+        margin=dict(l=10, r=10, t=60, b=80) # Aumenta margens superior e inferior para os textos respirarem
     )
     return fig
 
